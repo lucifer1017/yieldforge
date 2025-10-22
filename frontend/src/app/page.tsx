@@ -6,11 +6,16 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight, TrendingUp, Shield, Zap, Globe } from "lucide-react";
 import Link from "next/link";
 import { DepositModal } from "@/components/pyusd/DepositModal";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function HomePage() {
   const { isConnected } = useAccount();
   const [showDeposit, setShowDeposit] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   return (
     <div className="space-y-12">
@@ -26,7 +31,15 @@ export default function HomePage() {
           </p>
         </div>
         
-        {isConnected ? (
+        {!mounted ? (
+          <div className="space-y-4">
+            <div className="h-12 w-64 bg-muted animate-pulse rounded-md mx-auto"></div>
+            <div className="flex justify-center gap-4">
+              <div className="h-12 w-32 bg-muted animate-pulse rounded-md"></div>
+              <div className="h-12 w-32 bg-muted animate-pulse rounded-md"></div>
+            </div>
+          </div>
+        ) : isConnected ? (
           <div className="space-y-4">
             <Button 
               size="lg" 
