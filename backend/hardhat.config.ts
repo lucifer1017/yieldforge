@@ -1,5 +1,6 @@
 import type { HardhatUserConfig } from "hardhat/config";
-
+import dotenv from "dotenv"; 
+dotenv.config();
 import hardhatToolboxViemPlugin from "@nomicfoundation/hardhat-toolbox-viem";
 import { configVariable } from "hardhat/config";
 
@@ -34,8 +35,9 @@ const config: HardhatUserConfig = {
     sepolia: {
       type: "http",
       chainType: "l1",
-      url: configVariable("TESTNET_PRIVATE_KEY" ),
-      accounts: [configVariable("ALCHEMY_TESTNET_RPC_URL")],
+      gasPrice:6000000000,
+      url: configVariable("ALCHEMY_TESTNET_RPC_URL" ),
+      accounts: [configVariable("TESTNET_PRIVATE_KEY")],
     },
     
   },

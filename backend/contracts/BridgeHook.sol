@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./interfaces/IBridgeHook.sol";
@@ -53,24 +53,6 @@ contract BridgeHook is IBridgeHook, AccessControl, ReentrancyGuard {
     uint256 public maxBridgeAmount = 1000000e6; // 1M tokens
 
     /// @notice Events
-    event BridgeInitiated(
-        address indexed user,
-        address indexed token,
-        uint256 amount,
-        uint256 toChainId,
-        bytes executeData,
-        bytes32 operationId
-    );
-    
-    event BridgeExecuted(
-        address indexed user,
-        address indexed token,
-        uint256 amount,
-        uint256 toChainId,
-        bytes32 operationId,
-        uint256 timestamp
-    );
-    
     event TokenSupported(address indexed token, bool supported);
     event ChainSupported(uint256 indexed chainId, bool supported);
     event BridgeFeeUpdated(uint256 newFeeBps);
@@ -269,13 +251,12 @@ contract BridgeHook is IBridgeHook, AccessControl, ReentrancyGuard {
      * @param user Address of the user
      * @param token Address of token
      * @param amount Amount of tokens
-     * @param toChainId Destination chain ID
      */
     function _simulateBridgeExecution(
         address user,
         address token,
         uint256 amount,
-        uint256 toChainId
+        uint256 /* toChainId */
     ) internal {
         // In a real implementation, this would:
         // 1. Call the actual bridge contract (e.g., Avail Nexus)
@@ -291,10 +272,8 @@ contract BridgeHook is IBridgeHook, AccessControl, ReentrancyGuard {
      * @dev Initialize supported tokens
      */
     function _initializeSupportedTokens() internal {
-        // Mock token addresses for demo
-        supportedTokens[0x6f7C932e7684666C9fd1d44527765433e01C5b51] = true; // PYUSD on Sepolia
-        supportedTokens[0xA0b86a33E6441c8C06DdD4b4C4bF0Df4C4b4C4b4C] = true; // Mock USDC
-        supportedTokens[0xB0c86a33E6441c8C06DdD4b4C4bF0Df4C4b4C4b4C] = true; // Mock ETH
+        // Only PYUSD on Sepolia for now
+        supportedTokens[0xCaC524BcA292aaade2DF8A05cC58F0a65B1B3bB9] = true; // PYUSD on Sepolia
     }
 
     /**

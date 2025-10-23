@@ -3,14 +3,14 @@ import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
 export default buildModule("CompleteDeploymentModule", (m) => {
   // Deploy all contracts in the correct order
   
-  // 1. Deploy MockPYUSD
-  const mockPYUSD = m.contract("MockPYUSD", ["PYUSD", "PYUSD", 18]);
+  // 1. Use real PYUSD Sepolia address
+  const PYUSD_ADDRESS = "0xCaC524BcA292aaade2DF8A05cC58F0a65B1B3bB9";
   
   // 2. Deploy MockPyth
   const mockPyth = m.contract("MockPyth");
   
-  // 3. Deploy YieldVault with MockPYUSD as asset
-  const yieldVault = m.contract("YieldVault", [mockPYUSD]);
+  // 3. Deploy YieldVault with real PYUSD as asset
+  const yieldVault = m.contract("YieldVault", [PYUSD_ADDRESS]);
   
   // 4. Deploy IntentManager
   const intentManager = m.contract("IntentManager");
@@ -37,7 +37,6 @@ export default buildModule("CompleteDeploymentModule", (m) => {
   m.call(bridgeHook, "grantRole", ["0x0000000000000000000000000000000000000000000000000000000000000001", m.getAccount(0)]); // AGENT_ROLE
   
   return { 
-    mockPYUSD, 
     mockPyth, 
     yieldVault, 
     intentManager, 

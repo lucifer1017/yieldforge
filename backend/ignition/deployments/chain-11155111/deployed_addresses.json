@@ -1,0 +1,7 @@
+{
+  "YieldVaultModule#YieldVault": "0x64314E8BABCBa5040939d4CcD26086E7C1bcC54c",
+  "BridgeHookModule#BridgeHook": "0xf1EDe8B290ce69BbD16B3a3661242B856C581ffA",
+  "IntentManagerModule#BridgeHook": "0xf1EDe8B290ce69BbD16B3a3661242B856C581ffA",
+  "IntentManagerModule#YieldVault": "0x64314E8BABCBa5040939d4CcD26086E7C1bcC54c",
+  "IntentManagerModule#IntentManager": "0x08d59c4b69ED63a13cC2Eb2e9c45348458d828E3"
+}

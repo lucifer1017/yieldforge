@@ -2,9 +2,9 @@
 pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
-import "./interfaces/IPythIntegrator.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
+// Pyth integration removed - using frontend integration instead
 import "./interfaces/IBridgeHook.sol";
 import "./YieldVault.sol";
 
@@ -15,7 +15,7 @@ import "./YieldVault.sol";
  * @author YieldForge Team
  */
 contract IntentManager is AccessControl, ReentrancyGuard, Pausable {
-    using Math for uint256;
+    // using Math for uint256; // Math library moved in OpenZeppelin v5.x
 
     /// @notice Role for Lit Vincent agents
     bytes32 public constant AGENT_ROLE = keccak256("AGENT_ROLE");
@@ -38,8 +38,7 @@ contract IntentManager is AccessControl, ReentrancyGuard, Pausable {
     /// @notice YieldVault contract
     YieldVault public immutable vault;
     
-    /// @notice Pyth integrator for price feeds
-    IPythIntegrator public immutable pythIntegrator;
+    // Pyth integration removed - using frontend integration instead
     
     /// @notice Bridge hook for cross-chain operations
     IBridgeHook public bridgeHook;
@@ -109,11 +108,9 @@ contract IntentManager is AccessControl, ReentrancyGuard, Pausable {
     /**
      * @dev Constructor initializes the intent manager
      * @param vault_ Address of the YieldVault contract
-     * @param pythIntegrator_ Address of the Pyth integrator
      */
-    constructor(address vault_, address pythIntegrator_) {
+    constructor(address vault_) {
         vault = YieldVault(vault_);
-        pythIntegrator = IPythIntegrator(pythIntegrator_);
         
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(AGENT_ROLE, msg.sender);
@@ -193,7 +190,8 @@ contract IntentManager is AccessControl, ReentrancyGuard, Pausable {
         intent.lastExecuted = block.timestamp;
         
         // Calculate new APY (simplified for demo)
-        uint256 newApy = intent.minApy + (yieldGained * 10000) / vault.totalAssets();
+        uint256 totalAssets = vault.totalAssets();
+        uint256 newApy = totalAssets > 0 ? intent.minApy + (yieldGained * 10000) / totalAssets : intent.minApy;
         
         emit RebalanceExecuted(user, intentId, yieldGained, newApy, block.timestamp);
     }
@@ -298,34 +296,20 @@ contract IntentManager is AccessControl, ReentrancyGuard, Pausable {
      * @param intent Intent to validate against
      */
     function _validateAPY(Intent storage intent) internal view {
-        // Get current APY from Pyth (simplified for demo)
-        bytes32 feedId = priceFeedIds["USDC"];
-        if (feedId != bytes32(0)) {
-            IPythIntegrator.PriceData memory priceData = pythIntegrator.getValidPrice(feedId, 1 hours);
-            
-            if (!priceData.isValid) {
-                revert PythPriceStale();
-            }
-            
-            uint256 currentApy = pythIntegrator.getAPY(feedId);
-            
-            if (currentApy < intent.minApy) {
-                revert InsufficientAPY();
-            }
-        }
+        // APY validation removed - using frontend Pyth integration instead
+        // This function can be called by frontend with real APY data
     }
 
     /**
      * @dev Execute rebalance operation
      * @param user Address of the user
      * @param intent Intent to execute
-     * @param executionData Additional execution data
      * @return yieldGained Amount of yield gained
      */
     function _executeRebalance(
         address user,
         Intent storage intent,
-        bytes calldata executionData
+        bytes calldata /* executionData */
     ) internal returns (uint256 yieldGained) {
         // For cross-chain operations
         if (intent.targetChainId != 0 && address(bridgeHook) != address(0)) {

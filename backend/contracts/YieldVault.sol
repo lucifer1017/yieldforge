@@ -2,12 +2,11 @@
 pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
-import "./interfaces/IPythIntegrator.sol";
 import "./interfaces/IBridgeHook.sol";
 
 /**
@@ -28,8 +27,7 @@ contract YieldVault is ERC4626, ReentrancyGuard, Pausable, AccessControl {
     /// @notice PYUSD token contract
     IERC20 public immutable PYUSD;
     
-    /// @notice Pyth integrator for price feeds and guardrails
-    IPythIntegrator public immutable pythIntegrator;
+    // Pyth integration removed - using frontend integration instead
     
     /// @notice Bridge hook for cross-chain operations
     IBridgeHook public bridgeHook;
@@ -94,20 +92,17 @@ contract YieldVault is ERC4626, ReentrancyGuard, Pausable, AccessControl {
     error VaultPaused();
 
     /**
-     * @dev Constructor initializes the vault with PYUSD token and Pyth integrator
+     * @dev Constructor initializes the vault with PYUSD token
      * @param name_ Name of the vault token
      * @param symbol_ Symbol of the vault token
      * @param pyusd_ Address of PYUSD token contract
-     * @param pythIntegrator_ Address of Pyth integrator contract
      */
     constructor(
         string memory name_,
         string memory symbol_,
-        address pyusd_,
-        address pythIntegrator_
+        address pyusd_
     ) ERC4626(IERC20(pyusd_)) ERC20(name_, symbol_) {
         PYUSD = IERC20(pyusd_);
-        pythIntegrator = IPythIntegrator(pythIntegrator_);
         
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(AGENT_ROLE, msg.sender);
@@ -251,7 +246,7 @@ contract YieldVault is ERC4626, ReentrancyGuard, Pausable, AccessControl {
             revert InvalidBridge();
         }
         
-        PYUSD.safeApprove(bridge, amount);
+        PYUSD.approve(bridge, amount);
         
         emit BridgeApproval(bridge, amount, block.timestamp);
     }
@@ -348,14 +343,5 @@ contract YieldVault is ERC4626, ReentrancyGuard, Pausable, AccessControl {
         userLastDepositTime[user] = block.timestamp;
     }
 
-    /**
-     * @dev Override to add pause check
-     */
-    function _beforeTokenTransfer(address from, address to, uint256 amount)
-        internal
-        override
-        whenNotPaused
-    {
-        super._beforeTokenTransfer(from, to, amount);
-    }
+    // _beforeTokenTransfer removed - not needed for this implementation
 }

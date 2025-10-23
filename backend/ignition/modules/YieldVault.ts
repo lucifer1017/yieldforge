@@ -1,15 +1,15 @@
 import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
 
 export default buildModule("YieldVaultModule", (m) => {
-  // Deploy MockPYUSD first (needed for YieldVault constructor)
-  const mockPYUSD = m.contract("MockPYUSD", ["PYUSD", "PYUSD", 18]);
+  // Use real PYUSD Sepolia address
+  const PYUSD_ADDRESS = "0xCaC524BcA292aaade2DF8A05cC58F0a65B1B3bB9";
   
-  // Deploy YieldVault with MockPYUSD as the asset
-  const yieldVault = m.contract("YieldVault", [mockPYUSD]);
+  // Deploy YieldVault with PYUSD address only
+  const yieldVault = m.contract("YieldVault", [
+    "YieldForge Vault", // name
+    "YFV", // symbol  
+    PYUSD_ADDRESS // pyusd_
+  ]);
   
-  // Set up initial roles and configurations
-  m.call(yieldVault, "grantRole", ["0x0000000000000000000000000000000000000000000000000000000000000000", m.getAccount(0)]); // DEFAULT_ADMIN_ROLE
-  m.call(yieldVault, "grantRole", ["0x0000000000000000000000000000000000000000000000000000000000000001", m.getAccount(0)]); // AGENT_ROLE
-  
-  return { mockPYUSD, yieldVault };
+  return { yieldVault };
 });

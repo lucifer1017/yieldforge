@@ -37,7 +37,8 @@ interface IBridgeHook {
         address indexed token,
         uint256 amount,
         uint256 toChainId,
-        bytes executeData
+        bytes executeData,
+        bytes32 operationId
     );
     
     event BridgeExecuted(
@@ -45,6 +46,7 @@ interface IBridgeHook {
         address indexed token,
         uint256 amount,
         uint256 toChainId,
+        bytes32 operationId,
         uint256 timestamp
     );
 }
