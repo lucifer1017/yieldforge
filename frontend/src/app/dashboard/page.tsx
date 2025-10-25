@@ -13,21 +13,25 @@ import { ApyChart } from "@/components/dashboard/ApyChart";
 import { WithdrawModal } from "@/components/pyusd/WithdrawModal";
 import { VincentAgent } from "@/components/lit/VincentAgent";
 import { PythFeed } from "@/components/dashboard/PythFeed";
-import { useState } from "react";
+import { UnifiedBalance } from "@/components/nexus/UnifiedBalance";
+import { useBridgeTransactions } from "@/hooks/useBridgeTransactions";
+import { CHAIN_MAPPINGS } from "@/lib/nexus";
+import { useState, useEffect } from "react";
 
 export default function DashboardPage() {
   const { address, isConnected } = useAccount();
   const [showWithdraw, setShowWithdraw] = useState(false);
+  const { data: bridgeTxs, isLoading: bridgeLoading } = useBridgeTransactions();
 
   // Read vault data
-  const { data: balance } = useReadContract({
+  const { data: balance, refetch: refetchBalance } = useReadContract({
     address: VAULT_ADDRESS,
     abi: VAULT_ABI,
     functionName: "getBalance",
     args: address ? [address] : undefined,
   });
 
-  const { data: yieldEarned } = useReadContract({
+  const { data: yieldEarned, refetch: refetchYield } = useReadContract({
     address: VAULT_ADDRESS,
     abi: VAULT_ABI,
     functionName: "getYield",
@@ -37,8 +41,16 @@ export default function DashboardPage() {
   const { data: totalSupply } = useReadContract({
     address: VAULT_ADDRESS,
     abi: VAULT_ABI,
-    functionName: "totalSupply",
+    functionName: "totalAssets",
   });
+
+  // Refresh data when component mounts
+  useEffect(() => {
+    if (address) {
+      refetchBalance();
+      refetchYield();
+    }
+  }, [address, refetchBalance, refetchYield]);
 
   if (!isConnected) {
     return (
@@ -57,9 +69,19 @@ export default function DashboardPage() {
     );
   }
 
-  const userBalance = balance ? Number(formatUnits(balance, 18)) : 0;
-  const userYield = yieldEarned ? Number(formatUnits(yieldEarned, 18)) : 0;
+  const userBalance = balance ? Number(formatUnits(balance as bigint, 6)) : 0;
+  const userYield = yieldEarned ? Number(formatUnits(yieldEarned as bigint, 6)) : 0;
   const totalValue = userBalance + userYield;
+  
+  // Debug logging
+  console.log("Dashboard Debug:", {
+    address,
+    balance: balance?.toString(),
+    yieldEarned: yieldEarned?.toString(),
+    userBalance,
+    userYield,
+    totalValue
+  });
 
   // Mock data for demonstration
   const mockApyData = [
@@ -97,9 +119,21 @@ export default function DashboardPage() {
             </p>
           </div>
         </div>
-        <Button onClick={() => setShowWithdraw(true)}>
-          Withdraw Funds
-        </Button>
+        <div className="flex space-x-2">
+          <Button 
+            variant="outline" 
+            onClick={() => {
+              refetchBalance();
+              refetchYield();
+            }}
+          >
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Refresh
+          </Button>
+          <Button onClick={() => setShowWithdraw(true)}>
+            Withdraw Funds
+          </Button>
+        </div>
       </div>
 
       {/* Balance Cards */}
@@ -150,7 +184,7 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-8">
+      <div className="grid lg:grid-cols-3 gap-8">
         {/* APY Chart */}
         <Card>
           <CardHeader>
@@ -166,6 +200,9 @@ export default function DashboardPage() {
 
         {/* Vincent Agent */}
         <VincentAgent />
+
+        {/* Unified Balance */}
+        <UnifiedBalance />
       </div>
 
       {/* Pyth Price Feeds */}
@@ -178,51 +215,63 @@ export default function DashboardPage() {
       {/* Recent Activity */}
       <Card>
         <CardHeader>
-          <CardTitle>Recent Activity</CardTitle>
+          <CardTitle>Cross-Chain Activity</CardTitle>
           <CardDescription>
-            Latest transactions and rebalancing events
+            Latest bridge transactions via Avail Nexus
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {[
-              {
-                type: "rebalance",
-                description: "Rebalanced to Aave USDC on Base",
-                amount: "+0.3% APY",
-                time: "2 hours ago",
-                status: "success",
-              },
-              {
-                type: "deposit",
-                description: "Deposited 1000 PYUSD",
-                amount: "1000 PYUSD",
-                time: "1 day ago",
-                status: "success",
-              },
-              {
-                type: "yield",
-                description: "Yield earned from Morpho",
-                amount: "+$12.50",
-                time: "3 days ago",
-                status: "success",
-              },
-            ].map((activity, index) => (
-              <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <div className={`w-2 h-2 rounded-full ${
-                    activity.status === "success" ? "bg-green-500" : "bg-yellow-500"
-                  }`} />
-                  <div>
-                    <p className="text-sm font-medium">{activity.description}</p>
-                    <p className="text-xs text-muted-foreground">{activity.time}</p>
+            {bridgeLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="animate-pulse flex items-center space-x-3 p-3 border rounded-lg">
+                    <div className="w-2 h-2 rounded-full bg-muted"></div>
+                    <div className="flex-1">
+                      <div className="h-4 bg-muted rounded w-3/4 mb-2"></div>
+                      <div className="h-3 bg-muted rounded w-1/2"></div>
+                    </div>
+                    <div className="h-4 bg-muted rounded w-16"></div>
                   </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-medium">{activity.amount}</p>
-                </div>
+                ))}
               </div>
-            ))}
+            ) : bridgeTxs && bridgeTxs.length > 0 ? (
+              bridgeTxs.slice(0, 5).map((tx, index) => {
+                const chainName = CHAIN_MAPPINGS[Number(tx.toChainId) as keyof typeof CHAIN_MAPPINGS] || 'Unknown';
+                const amount = Number(formatUnits(tx.amount, 6));
+                const timeAgo = new Date(tx.timestamp * 1000).toLocaleString();
+                
+                return (
+                  <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      <div className={`w-2 h-2 rounded-full ${
+                        tx.type === "executed" ? "bg-green-500" : "bg-yellow-500"
+                      }`} />
+                      <div>
+                        <p className="text-sm font-medium">
+                          {tx.type === "initiated" ? "Bridge Initiated" : "Bridge Executed"} to {chainName}
+                        </p>
+                        <p className="text-xs text-muted-foreground">{timeAgo}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-medium">
+                        {tx.type === "initiated" ? "-" : "+"}{amount.toFixed(2)} PYUSD
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {tx.hash.slice(0, 8)}...
+                      </p>
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <Activity className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p>No cross-chain activity yet</p>
+                <p className="text-sm">Create an intent to start bridging!</p>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

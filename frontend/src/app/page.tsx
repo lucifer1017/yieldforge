@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { ArrowRight, TrendingUp, Shield, Zap, Globe } from "lucide-react";
 import Link from "next/link";
-import { DepositModal } from "@/components/pyusd/DepositModal";
+import { FlexibleDepositModal } from "@/components/pyusd/FlexibleDepositModal";
 import { useState, useEffect } from "react";
 
 export default function HomePage() {
@@ -26,7 +26,7 @@ export default function HomePage() {
             YieldForge
           </h1>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Deposit PYUSD once, let AI hunt yields cross-chain. 
+            Deposit USDC/PYUSD once, let AI hunt yields cross-chain. 
             Non-custodial DeFi automation with intelligent rebalancing.
           </p>
         </div>
@@ -47,7 +47,7 @@ export default function HomePage() {
               className="text-lg px-8 py-6"
             >
               <TrendingUp className="mr-2 h-5 w-5" />
-              Deposit PYUSD & Start Earning
+              Deposit & Start Earning
               <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
             <div className="flex justify-center gap-4">
@@ -170,9 +170,10 @@ export default function HomePage() {
       </section>
 
       {/* Deposit Modal */}
-      <DepositModal 
+      <FlexibleDepositModal 
         open={showDeposit} 
         onOpenChange={setShowDeposit} 
+        initialToken="USDC"
       />
     </div>
   );

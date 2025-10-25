@@ -4,27 +4,43 @@ import { Inter } from "next/font/google";
 import { WagmiProvider, createConfig, http } from "wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { sepolia } from "viem/chains";
-import { injected } from "wagmi/connectors";
+import { injected, metaMask } from "wagmi/connectors";
 import { Toaster } from "sonner";
 import { ThemeProvider } from "next-themes";
 import { ConnectButton } from "@/components/wallet/ConnectButton";
 import { NexusProvider } from "@/components/nexus/NexusProvider";
 import { Navigation } from "@/components/Navigation";
+import { NetworkChecker } from "@/components/wallet/NetworkChecker";
 
 import "./globals.css";
 import { supportedChains } from "@/lib/chains";
 
 const inter = Inter({ subsets: ["latin"] });
 
+// ⚠️ TESTNET ONLY CONFIGURATION
 const config = createConfig({
-  chains: supportedChains,
-  connectors: [injected()],
+  chains: [sepolia], // ONLY Sepolia testnet
+  connectors: [
+    injected(), 
+    metaMask({
+      dappMetadata: {
+        name: "YieldForge",
+        url: typeof window !== 'undefined' ? window.location.origin : '',
+      },
+    })
+  ],
   transports: {
-    [sepolia.id]: http(),
+    [sepolia.id]: http('https://ethereum-sepolia.publicnode.com'),
   },
 });
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 export default function RootLayout({
   children,
@@ -44,6 +60,7 @@ export default function RootLayout({
                 disableTransitionOnChange
               >
               <div className="min-h-screen bg-background">
+                <NetworkChecker />
                 <header className="border-b">
                   <div className="container mx-auto px-4 py-4">
                     <div className="flex items-center justify-between">

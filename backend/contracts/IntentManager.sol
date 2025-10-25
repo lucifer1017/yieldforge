@@ -301,34 +301,39 @@ contract IntentManager is AccessControl, ReentrancyGuard, Pausable {
     }
 
     /**
-     * @dev Execute rebalance operation
+     * @dev Execute rebalance operation with Avail Nexus integration
      * @param user Address of the user
      * @param intent Intent to execute
+     * @param executionData Additional data for cross-chain execution
      * @return yieldGained Amount of yield gained
      */
     function _executeRebalance(
         address user,
         Intent storage intent,
-        bytes calldata /* executionData */
+        bytes calldata executionData
     ) internal returns (uint256 yieldGained) {
-        // For cross-chain operations
+        // For cross-chain operations with Avail Nexus
         if (intent.targetChainId != 0 && address(bridgeHook) != address(0)) {
             uint256 userBalance = vault.balanceOf(user);
             if (userBalance > 0) {
                 // Approve bridge for cross-chain operation
                 vault.approveForBridge(address(bridgeHook), userBalance);
                 
-                // Execute bridge operation
-                bridgeHook.executeBridge(
-                    user,
+                // Execute bridge operation with execution data for target protocol
+                bridgeHook.initiateBridge(
                     address(vault.PYUSD()),
                     userBalance,
-                    intent.targetChainId
+                    intent.targetChainId,
+                    executionData // Contains calldata for target protocol (e.g., Aave deposit)
                 );
+                
+                // Emit rebalance request for off-chain monitoring
+                emit RebalanceRequested(user, 0, 0, intent.minApy, block.timestamp);
             }
         }
         
-        // Simulate yield gain (in production, this would be calculated based on actual protocol interactions)
+        // Calculate yield gain based on intent parameters
+        // In production, this would be calculated based on actual protocol interactions
         yieldGained = (vault.balanceOf(user) * intent.minApy) / 10000 / 365; // Daily yield
         
         // Update vault with yield

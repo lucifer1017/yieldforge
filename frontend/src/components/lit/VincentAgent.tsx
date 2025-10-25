@@ -69,7 +69,7 @@ export function VincentAgent({ intentId }: VincentAgentProps) {
       return { success: true, txHash: "0x123..." };
     } catch (error) {
       console.error("Ability execution failed:", error);
-      return { success: false, error: error.message };
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   };
 

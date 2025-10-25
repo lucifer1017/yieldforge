@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useAccount } from "wagmi";
+import { useState, useEffect } from "react";
+import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,13 +9,18 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Plus, Trash2, Brain, Zap } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Brain, Zap, AlertCircle, Play } from "lucide-react";
 import Link from "next/link";
 import { Intent, IntentStep, Guardrails } from "@/types";
 import { toast } from "sonner";
+import { INTENT_MANAGER_ADDRESS, VAULT_ADDRESS } from "@/lib/chains";
+import INTENT_MANAGER_ABI from "@/lib/abi/IntentManager.json";
+import VAULT_ABI from "@/lib/abi/Vault.json";
+import { useNexusBridge } from "@/hooks/useNexusBridge";
+import { formatUnits, parseUnits } from "viem";
 
 export default function IntentPage() {
-  const { isConnected } = useAccount();
+  const { isConnected, address } = useAccount();
   const [intent, setIntent] = useState<Intent>({
     id: "",
     name: "",
@@ -34,6 +39,63 @@ export default function IntentPage() {
   });
 
   const [aiSuggestion, setAiSuggestion] = useState<string | null>(null);
+  const [userIntents, setUserIntents] = useState<any[]>([]);
+
+  // Read VAULT balance (not wallet balance!)
+  const { data: vaultBalance, refetch: refetchBalance } = useReadContract({
+    address: VAULT_ADDRESS,
+    abi: VAULT_ABI,
+    functionName: "getBalance",
+    args: address ? [address] : undefined,
+  });
+
+  const vaultBalanceFormatted = vaultBalance 
+    ? Number(formatUnits(vaultBalance as bigint, 6)) 
+    : 0;
+
+  // Read user's intents from contract
+  const { data: contractIntents, refetch: refetchIntents } = useReadContract({
+    address: INTENT_MANAGER_ADDRESS,
+    abi: INTENT_MANAGER_ABI,
+    functionName: "getUserIntents",
+    args: address ? [address] : undefined,
+  });
+
+  // Contract write hook for submitting intent
+  const { writeContract, data: txHash, isPending } = useWriteContract();
+  
+  // Wait for transaction confirmation
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
+    hash: txHash,
+  });
+
+  const isSubmitting = isPending || isConfirming;
+
+  // Nexus bridge for cross-chain execution
+  const { transfer, isReady: isNexusReady, isTransferring } = useNexusBridge();
+  const [executingIntentId, setExecutingIntentId] = useState<number | null>(null);
+
+  // Show success toast when transaction confirms
+  useEffect(() => {
+    if (isSuccess && txHash) {
+      toast.success('Intent submitted successfully!', {
+        description: 'Your yield optimization intent is now active',
+        action: {
+          label: 'View Transaction',
+          onClick: () => window.open(`https://sepolia.etherscan.io/tx/${txHash}`, '_blank')
+        }
+      });
+      refetchBalance();
+      refetchIntents();
+    }
+  }, [isSuccess, txHash, refetchBalance, refetchIntents]);
+
+  // Update user intents when contract data changes
+  useEffect(() => {
+    if (contractIntents) {
+      setUserIntents(contractIntents as any[]);
+    }
+  }, [contractIntents]);
 
   if (!isConnected) {
     return (
@@ -102,15 +164,159 @@ export default function IntentPage() {
     toast.success("AI suggestion generated!");
   };
 
-  const saveIntent = () => {
+  const executeIntent = async (intentIndex: number, contractIntent: any) => {
+    if (!address || !isNexusReady) {
+      toast.error("Nexus SDK not ready");
+      return;
+    }
+
+    if (vaultBalanceFormatted === 0) {
+      toast.error("No funds in vault to execute intent");
+      return;
+    }
+
+    setExecutingIntentId(intentIndex);
+
+    try {
+      const targetChainId = Number(contractIntent.targetChainId);
+      const chainName = {
+        11155111: 'Ethereum Sepolia',
+        84532: 'Base Sepolia',
+        11155420: 'Optimism Sepolia',
+        421614: 'Arbitrum Sepolia'
+      }[targetChainId] || 'Unknown Chain';
+
+      console.log('🚀 Executing intent via Nexus:', {
+        intentIndex,
+        targetChainId,
+        chainName,
+        vaultBalance: vaultBalanceFormatted,
+        minApy: Number(contractIntent.minApy),
+        recipient: address
+      });
+
+      // Execute cross-chain transfer with Nexus
+      const result = await transfer({
+        token: 'USDC',
+        amount: Math.min(vaultBalanceFormatted, 10), // Start with small amount for demo
+        chainId: targetChainId,
+        recipient: address as `0x${string}`,
+      });
+
+      if (result.success) {
+        toast.success('Intent executed successfully!', {
+          description: `Cross-chain transfer completed to ${chainName}`,
+          action: {
+            label: 'View Transaction',
+            onClick: () => window.open(result.explorerUrl, '_blank')
+          }
+        });
+        setTimeout(() => {
+          refetchBalance();
+          refetchIntents();
+        }, 3000);
+      } else {
+        throw new Error(result.error);
+      }
+    } catch (error) {
+      console.error("Intent execution failed:", error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      toast.error(`Intent execution failed`, {
+        description: errorMessage
+      });
+    } finally {
+      setExecutingIntentId(null);
+    }
+  };
+
+  const saveIntent = async () => {
     if (!intent.name || intent.steps.length === 0) {
       toast.error("Please provide a name and add at least one step");
       return;
     }
 
-    // In a real app, this would save to local storage or backend
-    toast.success("Intent saved successfully!");
-    console.log("Saved intent:", intent);
+    if (!address) {
+      toast.error("Please connect your wallet");
+      return;
+    }
+
+    // Check if user has vault balance
+    if (vaultBalanceFormatted === 0) {
+      toast.error("No funds in vault. Please deposit USDC into the vault first.", {
+        description: "Go to homepage to deposit funds"
+      });
+      return;
+    }
+
+    try {
+      // Get the first step for cross-chain execution
+      const firstStep = intent.steps[0];
+      if (!firstStep) {
+        throw new Error("No steps configured");
+      }
+
+      // Map chain names to IDs (Sepolia testnets)
+      const chainIdMap: Record<string, number> = {
+        'ethereum': 11155111,  // Ethereum Sepolia
+        'base': 84532,         // Base Sepolia
+        'optimism': 11155420,  // Optimism Sepolia
+        'arbitrum': 421614     // Arbitrum Sepolia
+      };
+
+      const targetChainId = chainIdMap[firstStep.chain];
+
+      if (!targetChainId) {
+        throw new Error(`Unsupported chain: ${firstStep.chain}`);
+      }
+
+      // Mock protocol addresses (in production, these would be real addresses)
+      const protocolAddressMap: Record<string, `0x${string}`> = {
+        'aave': '0x1234567890123456789012345678901234567890',
+        'morpho': '0x2345678901234567890123456789012345678901',
+        'compound': '0x3456789012345678901234567890123456789012',
+        'uniswap': '0x4567890123456789012345678901234567890123'
+      };
+
+      const targetProtocol = protocolAddressMap[firstStep.protocol] || '0x0000000000000000000000000000000000000000';
+
+      // Convert guardrails to contract format
+      const minApyBps = Math.floor(intent.guardrails.minAPY * 100); // Convert % to basis points
+      const slippageBps = Math.floor(intent.guardrails.maxSlippage * 10000); // Convert decimal to basis points
+      const maxGasPriceGwei = BigInt(Math.floor(intent.guardrails.maxGasPrice * 1e9)); // Convert gwei to wei
+
+      console.log('📝 Submitting intent to IntentManager:', {
+        minApyBps,
+        slippageBps,
+        targetProtocol,
+        targetChainId,
+        maxGasPrice: maxGasPriceGwei.toString(),
+        vaultBalance: vaultBalanceFormatted
+      });
+
+      // Submit intent to IntentManager contract
+      writeContract({
+        address: INTENT_MANAGER_ADDRESS,
+        abi: INTENT_MANAGER_ABI,
+        functionName: 'submitIntent',
+        args: [{
+          minApy: BigInt(minApyBps),
+          slippageBps: slippageBps,
+          targetProtocol: targetProtocol,
+          targetChainId: BigInt(targetChainId),
+          maxGasPrice: maxGasPriceGwei,
+          isActive: true,
+          createdAt: BigInt(Math.floor(Date.now() / 1000)),
+          lastExecuted: BigInt(0)
+        }]
+      });
+      
+    } catch (error) {
+      console.error("Intent submission failed:", error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      toast.error(`Intent submission failed`, {
+        description: errorMessage
+      });
+    }
   };
 
   return (
@@ -157,6 +363,34 @@ export default function IntentPage() {
                   value={intent.description}
                   onChange={(e) => setIntent(prev => ({ ...prev, description: e.target.value }))}
                 />
+              </div>
+              
+              {/* Vault Balance Display */}
+              <div className="border-t pt-4">
+                <div className="flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950 dark:to-purple-950 rounded-lg border-2">
+                  <div>
+                    <p className="text-sm font-medium">Your Vault Balance</p>
+                    <p className="text-xs text-muted-foreground">Funds available for optimization</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-2xl font-bold">{vaultBalanceFormatted.toFixed(2)} USDC</p>
+                    {vaultBalanceFormatted === 0 ? (
+                      <p className="text-xs text-destructive flex items-center gap-1 justify-end">
+                        <AlertCircle className="h-3 w-3" />
+                        No balance in vault
+                      </p>
+                    ) : (
+                      <p className="text-xs text-green-600 dark:text-green-400">
+                        ✓ Ready for intent
+                      </p>
+                    )}
+                  </div>
+                </div>
+                {vaultBalanceFormatted === 0 && (
+                  <p className="text-xs text-muted-foreground mt-2 text-center">
+                    💡 Tip: Deposit USDC into the vault from the homepage first
+                  </p>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -361,20 +595,162 @@ export default function IntentPage() {
             </CardContent>
           </Card>
 
-          {/* Save Intent */}
+          {/* Submit Intent */}
           <Card>
-            <CardContent className="p-6">
+            <CardContent className="p-6 space-y-3">
               <Button
                 onClick={saveIntent}
                 className="w-full"
                 size="lg"
+                disabled={isSubmitting || vaultBalanceFormatted === 0 || intent.steps.length === 0 || !intent.name}
               >
-                Save Intent
+                {isSubmitting ? (
+                  <>
+                    <Zap className="mr-2 h-4 w-4 animate-spin" />
+                    Submitting Intent...
+                  </>
+                ) : (
+                  <>
+                    <Zap className="mr-2 h-4 w-4" />
+                    Submit Yield Intent
+                  </>
+                )}
               </Button>
+              
+              {/* Status messages */}
+              {vaultBalanceFormatted === 0 && (
+                <div className="flex items-center gap-2 text-xs text-destructive justify-center">
+                  <AlertCircle className="h-3 w-3" />
+                  <p>No vault balance. Deposit funds first.</p>
+                </div>
+              )}
+              {vaultBalanceFormatted > 0 && intent.steps.length === 0 && (
+                <div className="flex items-center gap-2 text-xs text-orange-500 justify-center">
+                  <AlertCircle className="h-3 w-3" />
+                  <p>Add at least one strategy step</p>
+                </div>
+              )}
+              {vaultBalanceFormatted > 0 && intent.steps.length > 0 && !intent.name && (
+                <div className="flex items-center gap-2 text-xs text-orange-500 justify-center">
+                  <AlertCircle className="h-3 w-3" />
+                  <p>Provide an intent name</p>
+                </div>
+              )}
+              {vaultBalanceFormatted > 0 && intent.steps.length > 0 && intent.name && (
+                <div className="text-xs text-muted-foreground text-center space-y-1">
+                  <p className="text-green-600 dark:text-green-400">✅ Ready to submit intent</p>
+                  <p className="text-xs">Intent will optimize {vaultBalanceFormatted.toFixed(2)} USDC</p>
+                  <p className="text-xs opacity-70">Target: {intent.steps[0]?.protocol} on {intent.steps[0]?.chain}</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
       </div>
+
+      {/* Submitted Intents Section */}
+      {userIntents && userIntents.length > 0 && (
+        <Card className="mt-8">
+          <CardHeader>
+            <CardTitle>Your Submitted Intents</CardTitle>
+            <CardDescription>
+              Execute your intents to perform cross-chain yield optimization
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {userIntents.map((contractIntent, index) => {
+                const targetChainId = Number(contractIntent.targetChainId);
+                const chainName = {
+                  11155111: 'Ethereum Sepolia',
+                  84532: 'Base Sepolia',
+                  11155420: 'Optimism Sepolia',
+                  421614: 'Arbitrum Sepolia'
+                }[targetChainId] || `Chain ${targetChainId}`;
+
+                const minApy = Number(contractIntent.minApy) / 100; // Convert from basis points
+                const slippage = Number(contractIntent.slippageBps) / 100;
+                const isActive = contractIntent.isActive;
+                const isExecuting = executingIntentId === index;
+
+                return (
+                  <div key={index} className="flex items-center justify-between p-4 border rounded-lg bg-card">
+                    <div className="flex-1 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <Badge variant={isActive ? "default" : "secondary"}>
+                          Intent #{index}
+                        </Badge>
+                        {!isActive && (
+                          <Badge variant="outline" className="text-xs">
+                            Inactive
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div>
+                          <span className="text-muted-foreground">Target Chain:</span>
+                          <span className="ml-2 font-medium">{chainName}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Min APY:</span>
+                          <span className="ml-2 font-medium">{minApy}%</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Max Slippage:</span>
+                          <span className="ml-2 font-medium">{slippage}%</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Created:</span>
+                          <span className="ml-2 font-medium">
+                            {new Date(Number(contractIntent.createdAt) * 1000).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      {isActive ? (
+                        <Button
+                          onClick={() => executeIntent(index, contractIntent)}
+                          disabled={isExecuting || isTransferring || !isNexusReady || vaultBalanceFormatted === 0}
+                          size="sm"
+                        >
+                          {isExecuting ? (
+                            <>
+                              <Zap className="mr-2 h-4 w-4 animate-spin" />
+                              Executing...
+                            </>
+                          ) : (
+                            <>
+                              <Play className="mr-2 h-4 w-4" />
+                              Execute Cross-Chain
+                            </>
+                          )}
+                        </Button>
+                      ) : (
+                        <Button variant="outline" size="sm" disabled>
+                          Inactive
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {!isNexusReady && (
+              <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
+                <AlertCircle className="h-4 w-4" />
+                <p>Nexus SDK initializing... Please wait to execute intents.</p>
+              </div>
+            )}
+            {isNexusReady && vaultBalanceFormatted === 0 && (
+              <div className="mt-4 flex items-center gap-2 text-sm text-destructive">
+                <AlertCircle className="h-4 w-4" />
+                <p>No vault balance. Deposit funds to execute intents.</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

@@ -13,7 +13,7 @@
       },
       {
         "internalType": "address",
-        "name": "pyusd_",
+        "name": "usdc_",
         "type": "address"
       }
     ],
@@ -234,16 +234,6 @@
   {
     "inputs": [],
     "name": "InvalidBridge",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "InvalidConfidence",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "PythPriceStale",
     "type": "error"
   },
   {
@@ -707,7 +697,7 @@
   },
   {
     "inputs": [],
-    "name": "PYUSD",
+    "name": "USDC",
     "outputs": [
       {
         "internalType": "contract IERC20",

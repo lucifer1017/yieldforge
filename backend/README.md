@@ -18,6 +18,22 @@ YieldForge is a non-custodial DeFi vault that enables AI-powered yield optimizat
 - **⚡ Lit Protocol Vincent**: AI agent automation with role-based access control
 - **📊 Pyth Network**: Real-time price feeds for yield optimization guardrails
 
+### 🔗 Avail Nexus Integration
+
+**Usage**: See `/hooks/useNexusBridge.ts` for `bridgeAndExecute` demo (cross-chain PYUSD to Aave on Base).
+
+**Demo Flow**: 
+1. Deposit PYUSD → Intent Builder → Bridge tx hash
+2. Cross-chain intent execution with protocol-specific calldata
+3. Unified balance tracking across chains
+4. Real-time bridge transaction monitoring
+
+**Key Features**:
+- **Cross-chain Intent Execution**: Bridge PYUSD from Sepolia to target chains (Base, Optimism, Arbitrum)
+- **Protocol Integration**: Generate execute calldata for Aave, Morpho, Compound protocols
+- **Unified Balance**: Track PYUSD across all chains via Avail Nexus
+- **Real-time Monitoring**: Dashboard shows bridge transaction history and status
+
 ## 🏗️ Architecture
 
 ### Core Contracts

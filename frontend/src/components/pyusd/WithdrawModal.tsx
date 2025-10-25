@@ -46,7 +46,7 @@ export function WithdrawModal({ open, onOpenChange, maxAmount }: WithdrawModalPr
 
     try {
       setIsWithdrawing(true);
-      const amountWei = parseUnits(amount, 18);
+      const amountWei = parseUnits(amount, 6);
       const hash = await writeContract({
         address: VAULT_ADDRESS,
         abi: VAULT_ABI,
@@ -68,7 +68,7 @@ export function WithdrawModal({ open, onOpenChange, maxAmount }: WithdrawModalPr
     onOpenChange(false);
   };
 
-  const amountWei = amount ? parseUnits(amount, 18) : 0n;
+  const amountWei = amount ? parseUnits(amount, 6) : 0n;
   const isValidAmount = amount && parseFloat(amount) > 0 && parseFloat(amount) <= maxAmount;
 
   return (

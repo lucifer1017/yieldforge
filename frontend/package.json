@@ -9,10 +9,13 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@avail-project/nexus-core": "^0.0.2",
+    "@avail-project/nexus-widgets": "^0.0.6",
     "@radix-ui/react-accordion": "^1.2.0",
     "@radix-ui/react-dialog": "^1.1.1",
     "@radix-ui/react-dropdown-menu": "^2.1.1",
     "@radix-ui/react-label": "^2.1.0",
+    "@radix-ui/react-popover": "^1.1.15",
     "@radix-ui/react-select": "^2.1.1",
     "@radix-ui/react-separator": "^1.1.0",
     "@radix-ui/react-slider": "^1.2.1",
@@ -27,6 +30,7 @@
     "autoprefixer": "^10.4.19",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
+    "cmdk": "^1.1.1",
     "date-fns": "^3.6.0",
     "lucide-react": "^0.408.0",
     "next": "15.5.6",
