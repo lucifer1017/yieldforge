@@ -38,6 +38,7 @@ export function NexusProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<Error | null>(null);
   const [progressSteps, setProgressSteps] = useState<ProgressStep[]>([]);
   const [completedSteps, setCompletedSteps] = useState<ProgressStep[]>([]);
+  const [hasShownError, setHasShownError] = useState(false); // Prevent spam
 
   // Initialize SDK when connector is available
   useEffect(() => {
@@ -56,6 +57,7 @@ export function NexusProvider({ children }: { children: React.ReactNode }) {
 
       setIsInitializing(true);
       setError(null);
+      setHasShownError(false); // Reset error flag
 
       try {
         console.log('🚀 Initializing Nexus SDK...');
@@ -76,11 +78,14 @@ export function NexusProvider({ children }: { children: React.ReactNode }) {
               setError(error);
               setIsInitializing(false);
               
-              // Show persistent error toast
-              toast.error('Cannot Initialize Nexus', {
-                description: 'You must be on Sepolia Testnet. Switch in MetaMask and reconnect.',
-                duration: 10000,
-              });
+              // Show error toast ONLY ONCE
+              if (!hasShownError) {
+                toast.error('Cannot Initialize Nexus', {
+                  description: 'You must be on Sepolia Testnet. Switch in MetaMask and reconnect.',
+                  duration: 10000,
+                });
+                setHasShownError(true);
+              }
               
               console.error('❌ BLOCKED: Cannot initialize Nexus SDK on wrong network');
               console.error(`❌ Current network: Chain ID ${providerChainId}`);
@@ -161,7 +166,15 @@ export function NexusProvider({ children }: { children: React.ReactNode }) {
         const error = err instanceof Error ? err : new Error('Unknown error');
         console.error('❌ Failed to initialize Nexus SDK:', error);
         setError(error);
-        toast.error('Failed to initialize Nexus SDK');
+        
+        // Show error toast ONLY ONCE
+        if (!hasShownError) {
+          toast.error('Failed to initialize Nexus SDK', {
+            description: error.message,
+            duration: 8000
+          });
+          setHasShownError(true);
+        }
       } finally {
         setIsInitializing(false);
       }
@@ -175,7 +188,7 @@ export function NexusProvider({ children }: { children: React.ReactNode }) {
         cleanupEvents();
       }
     };
-  }, [connector, isConnected, address, isInitialized, isInitializing]);
+  }, [connector, isConnected, address]); // REMOVED isInitialized and isInitializing to prevent infinite loop
 
   // Reset when wallet disconnects
   useEffect(() => {
@@ -185,6 +198,7 @@ export function NexusProvider({ children }: { children: React.ReactNode }) {
       setError(null);
       setProgressSteps([]);
       setCompletedSteps([]);
+      setHasShownError(false); // Reset error flag on disconnect
       console.log('🔌 Wallet disconnected, Nexus SDK reset');
     }
   }, [isConnected]);

@@ -40,6 +40,7 @@ export default function IntentPage() {
 
   const [aiSuggestion, setAiSuggestion] = useState<string | null>(null);
   const [userIntents, setUserIntents] = useState<any[]>([]);
+  const [intentAmount, setIntentAmount] = useState<string>("10"); // Amount to allocate for this intent
 
   // Read VAULT balance (not wallet balance!)
   const { data: vaultBalance, refetch: refetchBalance } = useReadContract({
@@ -175,6 +176,15 @@ export default function IntentPage() {
       return;
     }
 
+    // Get stored amount for this intent
+    const storedAmount = localStorage.getItem(`intent_amount_${address}_${intentIndex}`);
+    const intentAllocatedAmount = storedAmount ? parseFloat(storedAmount) : 10; // Default to 10 if not found
+
+    if (intentAllocatedAmount > vaultBalanceFormatted) {
+      toast.error(`Insufficient vault balance. Intent requires ${intentAllocatedAmount} USDC but you only have ${vaultBalanceFormatted.toFixed(2)} USDC`);
+      return;
+    }
+
     setExecutingIntentId(intentIndex);
 
     try {
@@ -190,15 +200,16 @@ export default function IntentPage() {
         intentIndex,
         targetChainId,
         chainName,
+        allocatedAmount: intentAllocatedAmount,
         vaultBalance: vaultBalanceFormatted,
         minApy: Number(contractIntent.minApy),
         recipient: address
       });
 
-      // Execute cross-chain transfer with Nexus
+      // Execute cross-chain transfer with Nexus using the allocated amount
       const result = await transfer({
         token: 'USDC',
-        amount: Math.min(vaultBalanceFormatted, 10), // Start with small amount for demo
+        amount: intentAllocatedAmount,
         chainId: targetChainId,
         recipient: address as `0x${string}`,
       });
@@ -248,6 +259,18 @@ export default function IntentPage() {
       return;
     }
 
+    // Validate intent amount
+    const amount = parseFloat(intentAmount);
+    if (isNaN(amount) || amount <= 0) {
+      toast.error("Please enter a valid amount for this intent");
+      return;
+    }
+
+    if (amount > vaultBalanceFormatted) {
+      toast.error(`Insufficient vault balance. You have ${vaultBalanceFormatted.toFixed(2)} USDC but trying to allocate ${amount} USDC`);
+      return;
+    }
+
     try {
       // Get the first step for cross-chain execution
       const firstStep = intent.steps[0];
@@ -290,10 +313,11 @@ export default function IntentPage() {
         targetProtocol,
         targetChainId,
         maxGasPrice: maxGasPriceGwei.toString(),
+        allocatedAmount: amount,
         vaultBalance: vaultBalanceFormatted
       });
 
-      // Submit intent to IntentManager contract
+      // Submit intent to IntentManager contract with explicit gas limit
       writeContract({
         address: INTENT_MANAGER_ADDRESS,
         abi: INTENT_MANAGER_ABI,
@@ -307,8 +331,13 @@ export default function IntentPage() {
           isActive: true,
           createdAt: BigInt(Math.floor(Date.now() / 1000)),
           lastExecuted: BigInt(0)
-        }]
+        }],
+        gas: BigInt(500000), // Explicit gas limit to prevent estimation issues
       });
+      
+      // Store amount in local storage for this intent (will use index after success)
+      const tempIntentIndex = userIntents.length; // Next intent index
+      localStorage.setItem(`intent_amount_${address}_${tempIntentIndex}`, intentAmount);
       
     } catch (error) {
       console.error("Intent submission failed:", error);
@@ -366,11 +395,11 @@ export default function IntentPage() {
               </div>
               
               {/* Vault Balance Display */}
-              <div className="border-t pt-4">
+              <div className="border-t pt-4 space-y-4">
                 <div className="flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950 dark:to-purple-950 rounded-lg border-2">
                   <div>
                     <p className="text-sm font-medium">Your Vault Balance</p>
-                    <p className="text-xs text-muted-foreground">Funds available for optimization</p>
+                    <p className="text-xs text-muted-foreground">Total funds available</p>
                   </div>
                   <div className="text-right">
                     <p className="text-2xl font-bold">{vaultBalanceFormatted.toFixed(2)} USDC</p>
@@ -386,8 +415,39 @@ export default function IntentPage() {
                     )}
                   </div>
                 </div>
+                
+                {/* Amount to Allocate for This Intent */}
+                {vaultBalanceFormatted > 0 && (
+                  <div className="space-y-2">
+                    <Label htmlFor="intentAmount">Amount to Allocate for This Intent (USDC)</Label>
+                    <div className="flex space-x-2">
+                      <Input
+                        id="intentAmount"
+                        type="number"
+                        placeholder="10"
+                        value={intentAmount}
+                        onChange={(e) => setIntentAmount(e.target.value)}
+                        min="0"
+                        max={vaultBalanceFormatted}
+                        step="0.01"
+                        className="flex-1"
+                      />
+                      <Button
+                        variant="outline"
+                        onClick={() => setIntentAmount(vaultBalanceFormatted.toFixed(2))}
+                        disabled={vaultBalanceFormatted === 0}
+                      >
+                        Max
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Specify how much USDC from your vault to use for this intent
+                    </p>
+                  </div>
+                )}
+                
                 {vaultBalanceFormatted === 0 && (
-                  <p className="text-xs text-muted-foreground mt-2 text-center">
+                  <p className="text-xs text-muted-foreground text-center">
                     💡 Tip: Deposit USDC into the vault from the homepage first
                   </p>
                 )}
@@ -602,7 +662,7 @@ export default function IntentPage() {
                 onClick={saveIntent}
                 className="w-full"
                 size="lg"
-                disabled={isSubmitting || vaultBalanceFormatted === 0 || intent.steps.length === 0 || !intent.name}
+                disabled={isSubmitting || vaultBalanceFormatted === 0 || intent.steps.length === 0 || !intent.name || !intentAmount || parseFloat(intentAmount) <= 0}
               >
                 {isSubmitting ? (
                   <>
@@ -636,10 +696,10 @@ export default function IntentPage() {
                   <p>Provide an intent name</p>
                 </div>
               )}
-              {vaultBalanceFormatted > 0 && intent.steps.length > 0 && intent.name && (
+              {vaultBalanceFormatted > 0 && intent.steps.length > 0 && intent.name && intentAmount && parseFloat(intentAmount) > 0 && (
                 <div className="text-xs text-muted-foreground text-center space-y-1">
                   <p className="text-green-600 dark:text-green-400">✅ Ready to submit intent</p>
-                  <p className="text-xs">Intent will optimize {vaultBalanceFormatted.toFixed(2)} USDC</p>
+                  <p className="text-xs">Intent will optimize {intentAmount} USDC</p>
                   <p className="text-xs opacity-70">Target: {intent.steps[0]?.protocol} on {intent.steps[0]?.chain}</p>
                 </div>
               )}
@@ -672,6 +732,10 @@ export default function IntentPage() {
                 const slippage = Number(contractIntent.slippageBps) / 100;
                 const isActive = contractIntent.isActive;
                 const isExecuting = executingIntentId === index;
+                
+                // Get allocated amount for this intent
+                const storedAmount = localStorage.getItem(`intent_amount_${address}_${index}`);
+                const allocatedAmount = storedAmount ? parseFloat(storedAmount) : 0;
 
                 return (
                   <div key={index} className="flex items-center justify-between p-4 border rounded-lg bg-card">
@@ -688,6 +752,12 @@ export default function IntentPage() {
                       </div>
                       <div className="grid grid-cols-2 gap-2 text-sm">
                         <div>
+                          <span className="text-muted-foreground">Allocated Amount:</span>
+                          <span className="ml-2 font-bold text-blue-600 dark:text-blue-400">
+                            {allocatedAmount > 0 ? `${allocatedAmount} USDC` : 'Not set'}
+                          </span>
+                        </div>
+                        <div>
                           <span className="text-muted-foreground">Target Chain:</span>
                           <span className="ml-2 font-medium">{chainName}</span>
                         </div>
@@ -698,12 +768,6 @@ export default function IntentPage() {
                         <div>
                           <span className="text-muted-foreground">Max Slippage:</span>
                           <span className="ml-2 font-medium">{slippage}%</span>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">Created:</span>
-                          <span className="ml-2 font-medium">
-                            {new Date(Number(contractIntent.createdAt) * 1000).toLocaleDateString()}
-                          </span>
                         </div>
                       </div>
                     </div>
