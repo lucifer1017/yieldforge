@@ -174,8 +174,8 @@ export function NexusProvider({ children }: { children: React.ReactNode }) {
           onStepComplete: (step) => {
             setCompletedSteps(prev => [...prev, step]);
             
-            if (step.typeID === 'IS' && step.data && 'explorerURL' in step.data) {
-              const explorerURL = step.data.explorerURL as string;
+            if (step.typeID === 'IS' && step.data && typeof step.data === 'object' && 'explorerURL' in step.data) {
+              const explorerURL = (step.data as any).explorerURL as string;
               if (explorerURL) {
                 toast.success('Transaction submitted!', {
                   description: 'View in explorer',

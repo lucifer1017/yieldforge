@@ -139,64 +139,61 @@ export function setupNexusEvents(
     onBridgeExecuteCompletedSteps?: (step: ProgressStep) => void;
   }
 ) {
-  const unsubscribers: (() => void)[] = [];
-
-  // Transfer & Bridge Progress (optimized operations)
-  const unsubExpectedSteps = sdk.nexusEvents.on(
-    NEXUS_EVENTS.EXPECTED_STEPS,
-    (steps: ProgressStep[]) => {
-      console.log('📊 Expected steps:', steps.map((s) => s.typeID));
-      callbacks?.onExpectedSteps?.(steps);
-    }
-  );
-  unsubscribers.push(unsubExpectedSteps);
-
-  const unsubStepComplete = sdk.nexusEvents.on(
-    NEXUS_EVENTS.STEP_COMPLETE,
-    (step: ProgressStep) => {
-      console.log('✅ Step completed:', step.typeID, step.data);
-      
-      // Log transaction hash if available
-      if (step.typeID === 'IS' && step.data.explorerURL) {
-        console.log('🔗 Transaction hash:', step.data.transactionHash);
-        console.log('🔗 Explorer URL:', step.data.explorerURL);
+  try {
+    // Transfer & Bridge Progress (optimized operations)
+    sdk.nexusEvents.on(
+      NEXUS_EVENTS.EXPECTED_STEPS,
+      (steps: ProgressStep[]) => {
+        console.log('📊 Expected steps:', steps.map((s) => s.typeID));
+        callbacks?.onExpectedSteps?.(steps);
       }
-      
-      callbacks?.onStepComplete?.(step);
-    }
-  );
-  unsubscribers.push(unsubStepComplete);
+    );
 
-  // Bridge & Execute Progress
-  const unsubBridgeExecuteExpected = sdk.nexusEvents.on(
-    NEXUS_EVENTS.BRIDGE_EXECUTE_EXPECTED_STEPS,
-    (steps: ProgressStep[]) => {
-      console.log('📊 Bridge & Execute expected steps:', steps.map((s) => s.typeID));
-      callbacks?.onBridgeExecuteExpectedSteps?.(steps);
-    }
-  );
-  unsubscribers.push(unsubBridgeExecuteExpected);
-
-  const unsubBridgeExecuteCompleted = sdk.nexusEvents.on(
-    NEXUS_EVENTS.BRIDGE_EXECUTE_COMPLETED_STEPS,
-    (step: ProgressStep) => {
-      console.log('✅ Bridge & Execute step completed:', step.typeID, step.data);
-      
-      if (step.typeID === 'IS' && step.data.explorerURL) {
-        console.log('🔗 View transaction:', step.data.explorerURL);
+    sdk.nexusEvents.on(
+      NEXUS_EVENTS.STEP_COMPLETE,
+      (step: ProgressStep) => {
+        console.log('✅ Step completed:', step.typeID, step.data);
+        
+        // Log transaction hash if available
+        if (step.typeID === 'IS' && step.data && typeof step.data === 'object' && 'explorerURL' in step.data) {
+          console.log('🔗 Transaction hash:', (step.data as any).transactionHash);
+          console.log('🔗 Explorer URL:', (step.data as any).explorerURL);
+        }
+        
+        callbacks?.onStepComplete?.(step);
       }
-      
-      callbacks?.onBridgeExecuteCompletedSteps?.(step);
-    }
-  );
-  unsubscribers.push(unsubBridgeExecuteCompleted);
+    );
 
-  console.log('✅ Nexus event listeners configured');
+    // Bridge & Execute Progress
+    sdk.nexusEvents.on(
+      NEXUS_EVENTS.BRIDGE_EXECUTE_EXPECTED_STEPS,
+      (steps: ProgressStep[]) => {
+        console.log('📊 Bridge & Execute expected steps:', steps.map((s) => s.typeID));
+        callbacks?.onBridgeExecuteExpectedSteps?.(steps);
+      }
+    );
 
-  // Return cleanup function
+    sdk.nexusEvents.on(
+      NEXUS_EVENTS.BRIDGE_EXECUTE_COMPLETED_STEPS,
+      (step: ProgressStep) => {
+        console.log('✅ Bridge & Execute step completed:', step.typeID, step.data);
+        
+        if (step.typeID === 'IS' && step.data && typeof step.data === 'object' && 'explorerURL' in step.data) {
+          console.log('🔗 View transaction:', (step.data as any).explorerURL);
+        }
+        
+        callbacks?.onBridgeExecuteCompletedSteps?.(step);
+      }
+    );
+
+    console.log('✅ Nexus event listeners configured');
+  } catch (error) {
+    console.warn('⚠️ Nexus event listeners setup had issues:', error);
+  }
+
+  // Return cleanup function (no-op for now since SDK doesn't provide proper cleanup)
   return () => {
-    unsubscribers.forEach(unsubscribe => unsubscribe());
-    console.log('🧹 Nexus event listeners cleaned up');
+    console.log('🧹 Nexus event listeners cleanup called');
   };
 }
 

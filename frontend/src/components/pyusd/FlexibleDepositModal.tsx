@@ -218,7 +218,7 @@ export function FlexibleDepositModal({ open, onOpenChange, initialToken = DEFAUL
   const balanceFormatted = balance ? formatUnits(balance as bigint, decimals) : "0";
   const allowanceFormatted = allowance ? formatUnits(allowance as bigint, decimals) : "0";
   const amountInWei = amount ? parseUnits(amount, decimals) : 0n;
-  const hasEnoughAllowance = allowance && amountInWei > 0n && allowance >= amountInWei;
+  const hasEnoughAllowance = allowance && amountInWei > 0n && (allowance as bigint) >= amountInWei;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
