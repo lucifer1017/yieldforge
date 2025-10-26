@@ -767,9 +767,13 @@ export default function IntentPage() {
         
         console.log('✅ Transaction submitted to MetaMask, hash:', hash);
         
-        // Store amount in local storage for this intent (will use index after success)
+        // Store intent metadata in local storage (will use index after success)
         const tempIntentIndex = userIntents.length; // Next intent index
         localStorage.setItem(`intent_amount_${address}_${tempIntentIndex}`, intentAmount);
+        localStorage.setItem(`intent_name_${address}_${tempIntentIndex}`, intent.name);
+        if (intent.description) {
+          localStorage.setItem(`intent_description_${address}_${tempIntentIndex}`, intent.description);
+        }
         
         // Show pending toast
         toast.info('Transaction submitted!', {
@@ -1421,19 +1425,22 @@ export default function IntentPage() {
                 const isActive = contractIntent.isActive;
                 const isExecuting = executingIntentId === index;
                 
-                // Get allocated amount for this intent
+                // Get stored intent metadata
                 const storedAmount = localStorage.getItem(`intent_amount_${address}_${index}`);
                 const allocatedAmount = storedAmount ? parseFloat(storedAmount) : 0;
+                const intentName = localStorage.getItem(`intent_name_${address}_${index}`) || `Intent #${index}`;
+                const intentDescription = localStorage.getItem(`intent_description_${address}_${index}`);
                 
                 // Check if this intent can execute in testnet
                 const canExecuteInTestnet = targetChainId === 11155111;
 
                 return (
                   <div key={index} className="flex items-center justify-between p-4 border rounded-lg bg-card">
-                    <div className="flex-1 space-y-1">
-                      <div className="flex items-center gap-2">
-                        <Badge variant={isActive ? "default" : "secondary"}>
-                          Intent #{index}
+                    <div className="flex-1 space-y-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-semibold text-lg">{intentName}</h3>
+                        <Badge variant={isActive ? "default" : "secondary"} className="text-xs">
+                          #{index}
                         </Badge>
                         {!isActive && (
                           <Badge variant="outline" className="text-xs">
@@ -1441,6 +1448,9 @@ export default function IntentPage() {
                           </Badge>
                         )}
                       </div>
+                      {intentDescription && (
+                        <p className="text-sm text-muted-foreground italic">{intentDescription}</p>
+                      )}
                       <div className="grid grid-cols-2 gap-2 text-sm">
                         <div>
                           <span className="text-muted-foreground">Allocated Amount:</span>
