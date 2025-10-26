@@ -37,13 +37,18 @@ export async function initializeNexusSDK(
   network: NexusNetwork = 'testnet'
 ): Promise<NexusSDK> {
   try {
+    console.log('🌉 Creating Nexus SDK instance for cross-chain bridging...');
     // Initialize SDK
     const sdk = new NexusSDK({ network });
+    
+    console.log('🔗 Connecting Nexus SDK to wallet provider...');
     
     // Initialize with provider (required)
     await sdk.initialize(provider);
     
-    console.log('✅ Nexus SDK initialized successfully');
+    console.log('✅ Nexus SDK initialized successfully!');
+    console.log('🌉 Cross-chain bridging is now ready!');
+    console.log('📊 Supported chains: Base, Optimism, Arbitrum');
     return sdk;
   } catch (error) {
     console.error('❌ Failed to initialize Nexus SDK:', error);

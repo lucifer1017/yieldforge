@@ -1,6 +1,0 @@
-# Ignore all .md files in root directory only (not in subdirectories)
-/*.md
-
-# Keep important root README if you want to add it later
-# !README.md
-

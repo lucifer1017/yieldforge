@@ -117,7 +117,13 @@ export function ConnectButton() {
           {connectors.map((connector) => (
             <Button
               key={connector.uid}
-              onClick={() => connect({ connector, chainId: sepolia.id })}
+              onClick={() => {
+                try {
+                  connect({ connector, chainId: sepolia.id });
+                } catch (error) {
+                  console.error('Connection error:', error);
+                }
+              }}
               disabled={isPending}
               className="w-full justify-start"
               variant="outline"

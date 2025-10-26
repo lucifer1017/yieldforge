@@ -4,13 +4,14 @@ import { Inter } from "next/font/google";
 import { WagmiProvider, createConfig, http } from "wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { sepolia } from "viem/chains";
-import { injected, metaMask } from "wagmi/connectors";
+import { metaMask } from "wagmi/connectors";
 import { Toaster } from "sonner";
 import { ThemeProvider } from "next-themes";
 import { ConnectButton } from "@/components/wallet/ConnectButton";
 import { NexusProvider } from "@/components/nexus/NexusProvider";
 import { Navigation } from "@/components/Navigation";
 import { NetworkChecker } from "@/components/wallet/NetworkChecker";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 import "./globals.css";
 import { supportedChains } from "@/lib/chains";
@@ -21,11 +22,10 @@ const inter = Inter({ subsets: ["latin"] });
 const config = createConfig({
   chains: [sepolia], // ONLY Sepolia testnet
   connectors: [
-    injected(), 
     metaMask({
       dappMetadata: {
         name: "YieldForge",
-        url: typeof window !== 'undefined' ? window.location.origin : '',
+        url: "https://yieldforge.app",
       },
     })
   ],
@@ -75,7 +75,10 @@ export default function RootLayout({
                         </div>
                         <Navigation />
                       </div>
-                      <ConnectButton />
+                      <div className="flex items-center gap-3">
+                        <ThemeToggle />
+                        <ConnectButton />
+                      </div>
                     </div>
                   </div>
                 </header>

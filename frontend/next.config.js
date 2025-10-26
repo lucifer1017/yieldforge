@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+    reactStrictMode: false, // Disable to prevent double submissions in dev
     webpack: (config) => {
         config.resolve.fallback = {
             ...config.resolve.fallback,

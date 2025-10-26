@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { parseUnits, formatUnits } from "viem";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -17,29 +17,44 @@ interface WithdrawModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   maxAmount: number;
+  onWithdrawSuccess?: () => void;
 }
 
-export function WithdrawModal({ open, onOpenChange, maxAmount }: WithdrawModalProps) {
+export function WithdrawModal({ open, onOpenChange, maxAmount, onWithdrawSuccess }: WithdrawModalProps) {
   const { address } = useAccount();
   const [amount, setAmount] = useState("");
   const [isWithdrawing, setIsWithdrawing] = useState(false);
   const [txHash, setTxHash] = useState<string | null>(null);
 
-  const { writeContract } = useWriteContract();
+  const { writeContractAsync } = useWriteContract();
 
-  const { isLoading: isWithdrawPending } = useWaitForTransactionReceipt({
+  const { isLoading: isWithdrawPending, isSuccess: isWithdrawSuccess } = useWaitForTransactionReceipt({
     hash: txHash as `0x${string}`,
-    onSuccess: () => {
-      setIsWithdrawing(false);
-      toast.success("Withdrawal successful!");
-      setAmount("");
-      onOpenChange(false);
-    },
-    onError: () => {
-      setIsWithdrawing(false);
-      toast.error("Withdrawal failed");
-    },
   });
+
+  // Handle successful withdrawal
+  useEffect(() => {
+    if (isWithdrawSuccess && txHash) {
+      console.log('✅ Withdrawal confirmed!');
+      toast.success("Withdrawal successful!", {
+        description: "USDC has been transferred to your wallet",
+        action: {
+          label: 'View Transaction',
+          onClick: () => window.open(`https://sepolia.etherscan.io/tx/${txHash}`, '_blank')
+        }
+      });
+      setIsWithdrawing(false);
+      setAmount("");
+      setTxHash(null);
+      
+      // Call the success callback to refresh dashboard data
+      if (onWithdrawSuccess) {
+        onWithdrawSuccess();
+      }
+      
+      onOpenChange(false);
+    }
+  }, [isWithdrawSuccess, txHash, onOpenChange, onWithdrawSuccess]);
 
   const handleWithdraw = async () => {
     if (!amount || !address) return;
@@ -47,17 +62,49 @@ export function WithdrawModal({ open, onOpenChange, maxAmount }: WithdrawModalPr
     try {
       setIsWithdrawing(true);
       const amountWei = parseUnits(amount, 6);
-      const hash = await writeContract({
+      
+      console.log('💸 Initiating withdrawal:', {
+        amount,
+        amountWei: amountWei.toString(),
+        vaultAddress: VAULT_ADDRESS,
+        userAddress: address
+      });
+
+      const hash = await writeContractAsync({
         address: VAULT_ADDRESS,
         abi: VAULT_ABI,
         functionName: "withdraw",
-        args: [amountWei],
+        args: [amountWei, address, address],
       });
+      
+      console.log('✅ Withdraw transaction sent:', hash);
       setTxHash(hash);
-    } catch (error) {
+      
+      toast.success("Withdrawal transaction submitted!", {
+        description: "Waiting for confirmation...",
+        action: {
+          label: 'View on Etherscan',
+          onClick: () => window.open(`https://sepolia.etherscan.io/tx/${hash}`, '_blank')
+        }
+      });
+      
+      // Wait for the transaction to complete
+      // This will be handled by the useWaitForTransactionReceipt hook
+      
+    } catch (error: any) {
       setIsWithdrawing(false);
-      toast.error("Withdrawal failed");
-      console.error(error);
+      console.error('❌ Withdrawal error:', error);
+      
+      const errorMessage = error.message || String(error);
+      if (errorMessage.includes('user rejected') || errorMessage.includes('User denied')) {
+        toast.error('Transaction cancelled', {
+          description: 'You rejected the transaction in MetaMask'
+        });
+      } else {
+        toast.error("Withdrawal failed", {
+          description: errorMessage.slice(0, 100)
+        });
+      }
     }
   };
 
@@ -75,9 +122,9 @@ export function WithdrawModal({ open, onOpenChange, maxAmount }: WithdrawModalPr
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Withdraw PYUSD</DialogTitle>
+          <DialogTitle>Withdraw USDC</DialogTitle>
           <DialogDescription>
-            Withdraw your PYUSD and earned yields from the vault
+            Withdraw your USDC and earned yields from the vault
           </DialogDescription>
         </DialogHeader>
 
@@ -87,7 +134,7 @@ export function WithdrawModal({ open, onOpenChange, maxAmount }: WithdrawModalPr
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">Available to Withdraw</span>
-                <span className="text-lg font-bold">{maxAmount.toFixed(2)} PYUSD</span>
+                <span className="text-lg font-bold">{maxAmount.toFixed(2)} USDC</span>
               </div>
             </CardContent>
           </Card>
@@ -151,7 +198,7 @@ export function WithdrawModal({ open, onOpenChange, maxAmount }: WithdrawModalPr
                 Withdrawing...
               </>
             ) : (
-              "Withdraw PYUSD"
+              "Withdraw USDC"
             )}
           </Button>
         </div>

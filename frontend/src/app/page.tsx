@@ -26,8 +26,8 @@ export default function HomePage() {
             YieldForge
           </h1>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Deposit USDC/PYUSD once, let AI hunt yields cross-chain. 
-            Non-custodial DeFi automation with intelligent rebalancing.
+            Set your yield strategy once, execute automatically cross-chain. 
+            Non-custodial DeFi automation powered by Pyth oracles and Avail Nexus.
           </p>
         </div>
         
@@ -80,13 +80,13 @@ export default function HomePage() {
               <div className="p-2 bg-primary/10 rounded-lg">
                 <Zap className="h-6 w-6 text-primary" />
               </div>
-              <CardTitle>AI-Powered</CardTitle>
+              <CardTitle>Intent-Based</CardTitle>
             </div>
           </CardHeader>
           <CardContent>
             <CardDescription>
-              Intelligent yield optimization across multiple protocols and chains. 
-              AI agent automatically rebalances based on real-time APY data.
+              Set your yield preferences once - target APY, slippage, protocols. 
+              Your intents execute automatically when conditions are met, powered by Pyth price oracles.
             </CardDescription>
           </CardContent>
         </Card>
